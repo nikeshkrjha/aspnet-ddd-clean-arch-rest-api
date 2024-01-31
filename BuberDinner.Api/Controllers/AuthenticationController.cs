@@ -4,39 +4,32 @@ using BuberDinner.Application.Services.Authentication;
 using BuberDinner.Application.Common.Errors;
 using System.Net;
 using ErrorOr;
+using MediatR;
+using BuberDinner.Application.Authentication.Commands.Register;
+using BuberDinner.Application.Authentication.Queries.Login;
+
 
 namespace BuberDinner.Api.Controllers;
 
 [Route("auth")]
 public class AuthenticationController : ApiController
 {
-    private readonly IAuthenticationService _authenticationService;
-    public AuthenticationController(IAuthenticationService service)
+    private readonly ISender _mediator;
+    public AuthenticationController(ISender mediator)
     {
-        _authenticationService = service;
+        _mediator = mediator;
     }
 
     [HttpPost("register")]
-    public IActionResult Register(RegisterRequest request)
+    public async Task<IActionResult> Register(RegisterRequest request)
     {
-        ErrorOr<AuthenticationResult> authResult = _authenticationService.Register(
-            request.FirstName,
-            request.LastName,
-            request.Email,
-            request.Password);
+        var command = new RegisterCommand(request.FirstName, request.LastName, request.Email, request.Password);
+        ErrorOr<AuthenticationResult> authResult = await _mediator.Send(command);
 
         return authResult.Match(
             authResult => Ok(MapAuthResult(authResult)),
             errors => Problem(errors)
         );
-
-        // if (registerResult.IsT0)
-        // {
-        //     var authResult = registerResult.AsT0;
-        //     AuthenticationResponse response = MapAuthResult(authResult);
-        //     return Ok(response);
-        // }
-        // return Problem(statusCode: StatusCodes.Status409Conflict, title: "Email already exists");
     }
 
     private static AuthenticationResponse MapAuthResult(AuthenticationResult authResult)
@@ -50,11 +43,10 @@ public class AuthenticationController : ApiController
     }
 
     [HttpPost("login")]
-    public IActionResult Login(LoginRequest request)
+    public async Task<IActionResult> Login(LoginRequest request)
     {
-        var authResult = _authenticationService.Login(
-            request.Email,
-            request.Password);
+        var loginQuery = new LoginQuery(request.Email, request.Password);
+        ErrorOr<AuthenticationResult> authResult = await _mediator.Send(loginQuery);
 
         return authResult.Match(
             authResult => Ok(MapAuthResult(authResult)),
